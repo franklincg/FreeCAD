@@ -1,0 +1,53 @@
+name: MONEY_AGENT FreeCAD 6587 duplicate-zero fix
+
+on:
+  push:
+    branches:
+      - money-agent-6587-port-integration
+    paths:
+      - .github/workflows/money-agent-6587-duplicate-zero.yml
+      - tools/money_agent_6587_duplicate_zero.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out helper branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Preserve patch helper
+        run: cp tools/money_agent_6587_duplicate_zero.py /tmp/money_agent_6587_duplicate_zero.py
+
+      - name: Switch to candidate branch
+        shell: bash
+        run: |
+          git fetch origin money-agent-6587-ordinate-dimensions
+          git switch -C money-agent-6587-ordinate-dimensions origin/money-agent-6587-ordinate-dimensions
+
+      - name: Apply duplicate-zero guard
+        run: python3 /tmp/money_agent_6587_duplicate_zero.py
+
+      - name: Validate whitespace
+        run: git diff --check
+
+      - name: Commit and push candidate fix
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Candidate already contains the duplicate-zero guard"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Mod/TechDraw/Gui/CommandExtensionDims.cpp
+          git commit \
+            -m "TechDraw: avoid duplicate ordinate zero markers" \
+            -m "Adapt the duplicate-zero guard from bguest/FreeCAD commit 15be1ee54bd22ac9201b4c26b54451d64ffb96ff to the current #6587 candidate." \
+            -m "Co-authored-by: openhands <openhands@all-hands.dev>" \
+            -m "Assisted-by: GPT-5.6 Sol"
+          git push origin HEAD:money-agent-6587-ordinate-dimensions
