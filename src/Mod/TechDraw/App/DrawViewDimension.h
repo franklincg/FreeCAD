@@ -63,8 +63,6 @@ public:
         DistanceX,
         DistanceY,
         DistanceZ,
-        OrdinateX,
-        OrdinateY,
         Radius,
         Diameter,
         Angle,
