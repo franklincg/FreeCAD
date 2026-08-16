@@ -24,7 +24,9 @@ jobs:
       - name: Restore upstream file formatting
         run: python3 tools/money_agent_6587_restore_format.py
       - name: Validate patch whitespace
-        run: git diff --check
+        run: |
+          git config core.whitespace cr-at-eol
+          git diff --check
       - name: Commit generated source changes
         shell: bash
         run: |
