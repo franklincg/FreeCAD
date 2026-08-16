@@ -1,0 +1,35 @@
+name: MONEY_AGENT FreeCAD 6587 port helper
+
+on:
+  push:
+    branches:
+      - money-agent-6587-port-integration
+    paths:
+      - tools/money_agent_6587_port.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply-port:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply deterministic ordinate-dimension port
+        run: python3 tools/money_agent_6587_port.py
+      - name: Validate patch whitespace
+        run: git diff --check
+      - name: Commit generated source changes
+        shell: bash
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No source changes produced"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Mod/TechDraw
+          git commit -m "TechDraw: port ordinate dimensions to current main"
+          git push origin HEAD:${GITHUB_REF_NAME}
