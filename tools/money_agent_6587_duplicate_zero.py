@@ -8,7 +8,10 @@ current #6587 candidate without touching unrelated TechDraw code.
 
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+# The helper is intentionally copied to /tmp by CI before the workflow switches
+# branches. Use the checked-out repository working directory, not __file__, as
+# the source root so the patch is applied to the candidate branch checkout.
+ROOT = Path.cwd()
 PATH = ROOT / "src/Mod/TechDraw/Gui/CommandExtensionDims.cpp"
 text = PATH.read_text(encoding="utf-8-sig")
 
