@@ -1,0 +1,100 @@
+name: MONEY_AGENT #6587 Windows Build
+
+on:
+  push:
+    branches:
+      - money-agent-6587-windows-build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-portable:
+    runs-on: windows-2022
+    env:
+      builddir: C:/FC/build/release/
+      stagingdir: C:/FC/install/
+      libpackdir: C:/FC/libpack/
+      config: release
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          fetch-tags: true
+          submodules: recursive
+
+      - name: Make directories
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:libpackdir | Out-Null
+          New-Item -ItemType Directory -Force -Path $env:builddir | Out-Null
+          New-Item -ItemType Directory -Force -Path $env:stagingdir | Out-Null
+
+      - name: Download LibPack
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/FreeCAD/FreeCAD-LibPack/releases/download/3.5.3/LibPack-26.3.0-v3.5.3-x64-Release.7z'
+          $archive = 'C:/FC/libpack.7z'
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          7z x $archive -oC:/FC/libpack-extract -y
+          $source = Get-ChildItem C:/FC/libpack-extract -Directory | Select-Object -First 1
+          if (-not $source) { throw 'LibPack extraction failed' }
+          Copy-Item -Path ($source.FullName + '/*') -Destination $env:libpackdir -Recurse -Force
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.6'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -B"$env:builddir" . --preset $env:config `
+            -DCMAKE_VS_NO_COMPILE_BATCHING=ON `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_INSTALL_PREFIX="$env:stagingdir" `
+            -DFREECAD_USE_PCH=OFF `
+            -DFREECAD_RELEASE_PDB=OFF `
+            -DFREECAD_LIBPACK_DIR="$env:libpackdir" `
+            -DFREECAD_COPY_DEPEND_DIRS_TO_BUILD=ON `
+            -DFREECAD_COPY_LIBPACK_BIN_TO_BUILD=ON `
+            -DFREECAD_COPY_PLUGINS_BIN_TO_BUILD=ON
+
+      - name: Compile
+        shell: pwsh
+        run: |
+          Set-Location $env:builddir
+          msbuild ALL_BUILD.vcxproj /m /p:Configuration=Release /p:TrackFileAccess=false
+
+      - name: Install portable tree
+        shell: pwsh
+        run: |
+          cmake --install "$env:builddir" --prefix "$env:stagingdir" --config Release
+
+      - name: Smoke test binary
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:stagingdir 'bin/FreeCADCmd.exe'
+          if (-not (Test-Path $exe)) { throw 'FreeCADCmd.exe not found in staging tree' }
+          & $exe --version
+
+      - name: Package portable build
+        shell: pwsh
+        run: |
+          $zip = 'C:/FC/FreeCAD-6587-Windows-x86_64.zip'
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path ($env:stagingdir + '*') -DestinationPath $zip -CompressionLevel Fastest
+
+      - name: Upload portable build
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeCAD-6587-Windows-x86_64
+          path: C:/FC/FreeCAD-6587-Windows-x86_64.zip
+          if-no-files-found: error
+          retention-days: 14
