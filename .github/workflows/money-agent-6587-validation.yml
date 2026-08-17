@@ -1,0 +1,15 @@
+name: MONEY_AGENT FreeCAD 6587 validation
+
+on:
+  push:
+    branches:
+      - money-agent-6587-validation-d5df
+
+permissions:
+  contents: read
+
+jobs:
+  Ubuntu:
+    uses: ./.github/workflows/sub_buildUbuntu.yml
+    with:
+      artifactBasename: MONEY-6587-Ubuntu-${{ github.run_id }}
